@@ -1,0 +1,327 @@
+# createFrames
+
+`createFrames()` creates a function which accepts your frames handler and returns a request handler.
+
+Usually you shouldn't use this function directly but rather use one of our adapters based on a framework you are using, e.g. [Express.js](/reference/core/express), [Hono](/reference/core/hono), [Next.js](/reference/core/next) or [Remix](/reference/core/remix).
+
+```tsx
+import { createFrames } from "frames.js/core";
+
+const frames = createFrames();
+const handleRequest = frames(async (ctx) => {
+  return {
+    image: <span>Test</span>,
+  };
+});
+```
+
+The function passed to `frames` will be called with the context of a frame action and should return a `FrameDefinition`.
+
+## Parameters
+
+`createFrames` accepts an optional options object with the following properties:
+
+### `basePath`
+
+- Type: `string`
+
+A string that specifies the base path for all relative URLs in the frame definition. It defaults to `/`. If `baseUrl` is provided, it will be resolved relatively to `baseUrl`. If the `baseUrl` option is not provided, it will use URL of current request and override its path with `basePath` when generating target URLs.
+
+### `baseUrl`
+
+- Type: `string | URL`
+
+A string or URL object that specifies the base URL for all relative URLs in the frame definition. Can be used to override the URL detected from the request.
+
+### `debug`
+
+- Type: `boolean`
+
+Enables debug mode. Debug mode is necessary if you want to use image layout debugging in the debugger.
+
+### `signingSecret`
+
+- Type: `string`
+
+If provided, frames state and image URL payloads will be signed with this secret and validated on subsequent requests.
+
+Overridden by `stateSigningSecret` for state signing and `imagesSigningSecret` for signing images if provided.
+
+### `imagesRoute`
+
+- Type: `string | null`
+
+Image rendering will be handled by this route. It defaults to `/` relative to the `basePath`.
+
+The route must handle GET requests. It is recommended to use the initial frame route or any route that exports a `frames()` GET route handler.
+
+Pass `null` to disable async image rendering and use inline data URLs instead.
+
+### `imageRenderingOptions`
+
+- Type `ImageWorkerOptions | () => Promise<ImageWorkerOptions>`
+
+Options for the image renderer. If a function is provided, it will be called on each request to get the options.
+
+### `imagesSigningSecret`
+
+- Type: `string`
+
+A secret key used to sign and verify the image URLs. If provided, image URLs are automatically signed with this key and verified on each request.
+
+Overrides `signingSecret` for image signing if provided.
+
+### `initialState`
+
+- Type: generic
+
+A JSON serializable value that is used if no state is provided in the message or you are on the initial frame.
+
+### `stateSigningSecret`
+
+- Type: `string`
+
+A secret key used to sign and verify the state in the frame message. If provided, state is automatically signed with this key and verified on each frame.
+
+- If the signature is present in state data:
+  - If the secret is not provided, the state will not be verified and used as is.
+  - If the secret is provided and signature does not match error is thrown.
+  - If the secret is provided and signature matches, the state will be used as is.
+
+Overrides `signingSecret` for state signing if provided.
+
+### `middleware`
+
+See the [Middleware guide](/guides/middleware) for more information.
+
+Type: `FramesMiddleware`
+
+An array of middleware functions that are called before the frame handler and allows you to inject additional context into the `ctx` parameter passed to each frame handler call.
+
+Each middleware should return a promise that resolves to the next middleware, or a [Web API `Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response), or a `FrameDefinition`.
+
+#### Types
+
+For strong type support in the handler, the middleware should be typed as `FramesMiddleware<any, YourContextType>`.
+
+```tsx
+import { createFrames, types } from "frames.js/next";
+
+const myMiddleware: types.FramesMiddleware<any, { foo?: string }> = async (
+  ctx,
+  next
+) => {
+  return next({ foo: "bar" });
+};
+```
+
+#### Example
+
+```tsx [./app/frames/route.tsx]
+const frames = createFrames({
+  middleware: [
+    async (ctx, next) => {
+      console.log("Before frame handler");
+      const result = await next({ name: "Alice" });
+      console.log("After frame handler");
+      return result;
+    },
+  ],
+});
+
+const handler = frames(async (ctx) => {
+  return {
+    image: <span>{ctx.name}</span>, // Outputs an image with the text "Alice"
+  };
+});
+```
+
+## FrameDefinition
+
+`FrameDefinition` is an object that describes a frame. It has the following properties:
+
+### `image`
+
+- Type: `React.ReactElement | string`
+
+The image to be rendered in the frame. If a string is provided, it must be a valid URL.
+
+### `imageOptions`
+
+- Type: `{ aspectRatio?: "1.91:1" | "1:1" } & ConstructorParameters<typeof ImageResponse>[1]`
+
+Options for the image. The `aspectRatio` property can be set to `"1.91:1"` or `"1:1"`.
+
+### `buttons`
+
+- Type: 1, 2, 3, or 4 `FrameButtonElement` elements
+
+An array of buttons to be rendered in the frame. The buttons are rendered in the order they are provided.
+
+#### Example
+
+```tsx
+import { Button } from "frames.js/next";
+
+const handleRequest = frames(async (ctx) => {
+  return {
+    image: <span>Test</span>,
+    buttons: [
+      <Button action="post">Post</Button>,
+      <Button action="post_redirect">Post Redirect</Button>,
+    ],
+  };
+});
+```
+
+### `textInput`
+
+- Type: `string`
+
+Label for text input. If no value is provided, the input is not rendered.
+
+### `state`
+
+- Type: `JsonValue`
+
+Global app state that will be available on the next frame.
+
+### `headers`
+
+- Type: `HeadersInit`
+
+Custom headers to be included in the response.
+
+The `ResponseInit` properties allow you to specify custom headers such as `Cache-Control`.
+
+### Cache-Control
+
+If you wish to have dynamic content in your frame which is re-rendered on every feed reload, you can specify a low `Cache-Control` `max-age` value.
+
+Here is an example of a frame definition with a `Cache-Control` header set to `max-age=0`. It will always show the current time in the user's feed.
+
+```tsx
+/* eslint-disable react/jsx-key */
+import { Button } from "frames.js/next";
+import { createFrames } from "frames.js/next";
+
+const frames = createFrames();
+
+const handleRequest = frames(async (ctx) => {
+  return {
+    image: (
+      <div tw="bg-purple-800 text-white w-full h-full justify-center items-center flex">
+        The current time is {new Date().toLocaleString()}
+      </div>
+    ),
+    imageOptions: {
+      aspectRatio: "1:1",
+    },
+    buttons: [<Button action="post">Refresh</Button>],
+    headers: {
+      // [!code focus]
+      // Max cache age in seconds // [!code focus]
+      "Cache-Control": "max-age=0", // [!code focus]
+    }, // [!code focus]
+  };
+});
+```
+
+## Request Handler
+
+The resulting `handleRequest` is a function that accepts [Web API `Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request) and returns a Promise that resolves to [Web API `Response`](https://developer.mozilla.org/en-US/docs/Web/API/Response).
+
+```tsx
+handleRequest(new Request("/")).then((res) => {
+  return res.text();
+});
+```
+
+### Per-route middleware
+
+You can also pass middleware to the `handleRequest` function to be executed only for that specific route.
+
+```tsx
+const handleRequest = frames(
+  async (ctx) => {
+    return {
+      image: <span>Test</span>,
+    };
+  },
+  {
+    middleware: [farcasterHubContext({ hubHttpUrl: process.env.HUB_HTTP_URL })],
+  }
+);
+```
+
+This will only execute the `farcasterHubContext` middleware for the route that `handleRequest` is called with.
+
+## Context
+
+Core middleware is included and executed by default and gives you access to the following default context in your frame handlers:
+
+### `basePath`
+
+- Type: `string`
+
+Specifies the base path for all relative URLs in the frame definition.
+
+### `baseUrl`
+
+- Type: `URL`
+
+The resolved base URL for all relative URLs in the frame definition. All relative URLs are resolved relatively to this value.
+
+### `initialState`
+
+- Type: generic
+
+A JSON serializable value that is used if no state is provided in the message or you are on the initial frame.
+
+### `request`
+
+- Type: [Web API `Request`](https://developer.mozilla.org/en-US/docs/Web/API/Request)
+
+The request object that was passed to the request handler.
+
+### `url`
+
+- Type: [Web API `URL`](https://developer.mozilla.org/en-US/docs/Web/API/URL)
+
+The URL object that was parsed from the request.
+
+### `searchParams`
+
+- Type: `Record<string, string>`
+
+The search params in the URL as an object. If there are no search params, it will be an empty object.
+
+### `pressedButton`
+
+- Type: `undefined | { action: "post" | "post_redirect"; index: 1 | 2 | 3 | 4 }`
+
+The button that was clicked on the previous frame.
+
+### `buttonIndex`
+
+- Type: `number`
+
+The index of the button that was clicked on the previous frame.
+
+### `message`
+
+- Type: `FrameMessage | undefined`
+
+The frame message that was parsed from the request body.
+
+### `clientProtocol`
+
+- Type: `ClientProtocolId | undefined`
+
+The client protocol that was used to send the frame message.
+
+### `state`
+
+- Type: `JsonValue`
+
+The state extracted from the frame message. If you are on the initial frame (no button pressed), the value is the `initialState` value passed to `createFrames`. If you are on a frame with a button pressed, the value is the state from the previous frame.

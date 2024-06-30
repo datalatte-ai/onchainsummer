@@ -1,0 +1,33 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "**/dist/**", "!.next/cache/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "check:package-types": {
+      "cache": false
+    },
+    "check:package-lint": {
+      "cache": false
+    },
+    "check:types": {
+      "cache": false
+    }
+  },
+  "globalEnv": [
+    "NODE_ENV",
+    "NEXT_PUBLIC_HOST",
+    "FARCASTER_DEVELOPER_FID",
+    "FARCASTER_DEVELOPER_MNEMONIC"
+  ]
+}

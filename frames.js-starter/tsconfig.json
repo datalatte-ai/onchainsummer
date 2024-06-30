@@ -1,0 +1,3 @@
+{
+  "extends": "@framesjs/typescript-config/base.json",
+}

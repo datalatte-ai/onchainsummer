@@ -1,0 +1,69 @@
+# Cloudflare Workers integration
+
+Frames.js can be easily deployed to [Cloudflare Workers](https://workers.cloudflare.com).
+
+::::steps
+
+## Create a new project from template
+
+:::code-group
+
+```bash [npm]
+npm create frames -- --name my-cf-frames --template cloudflare-worker && cd ./my-cf-frames
+```
+
+```bash [yarn]
+yarn create frames --name my-cf-frames --template cloudflare-worker && cd ./my-cf-frames
+```
+
+```bash [pnpm]
+pnpm create frames --name my-cf-frames --template cloudflare-worker && cd ./my-cf-frames
+```
+
+:::
+
+## Edit the generated Frame handler
+
+Open `src/index.tsx` and edit the handler to your needs.
+
+## Develop and test locally
+
+Run following command to start the local server and debugger to test your Frames app locally.
+
+:::code-group
+
+```bash [npm]
+npm run dev
+```
+
+```bash [yarn]
+yarn dev
+```
+
+```bash [pnpm]
+pnpm dev
+```
+
+:::
+
+## Deploy to Cloudflare Workers
+
+When you are done with development and testing, run the following command to deploy your Frames app to Cloudflare Workers.
+
+:::code-group
+
+```bash [npm]
+npm run deploy
+```
+
+```bash [yarn]
+yarn deploy
+```
+
+```bash [pnpm]
+pnpm deploy
+```
+
+:::
+
+::::
